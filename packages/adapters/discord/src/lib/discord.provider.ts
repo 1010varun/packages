@@ -14,7 +14,6 @@ import { v4 as uuidv4 } from "uuid";
 export class DiscordProvider implements IChatProvider {
   channelType = ChannelTypeEnum.CHAT as ChannelTypeEnum.CHAT;
   public id = "discord";
-  private axiosInstance = axios.create();
 
   constructor(private config: DiscordBotProviderConfig) {}
 
@@ -23,7 +22,7 @@ export class DiscordProvider implements IChatProvider {
     const url = new URL(this.config.webhookUrl);
     url.searchParams.set("wait", "true");
     if (data.content.length <= 2000) {
-      const response = await this.axiosInstance.post(url.toString(), {
+      const response = await axios.post(url.toString(), {
           content: data.content,
         });
       return {
@@ -37,15 +36,25 @@ export class DiscordProvider implements IChatProvider {
     url.searchParams.set("wait", "true");
     const form = new FormData();
     form.append("file", fs.createReadStream(tempFilePath));
-    const response: AxiosResponse<any> = await this.axiosInstance.post(url.toString(),form, {
+    let response: AxiosResponse<any> | null = null;
+    try {
+      response = await axios.post(url.toString(), form, {
         headers: {
           ...form.getHeaders(),
         },
       });
-    fs.unlinkSync(tempFilePath);
-    return {
-      id: response.data.id, 
-      date: response.data.timestamp
-    };
+    } catch (e) {
+      console.log(e);
+    } finally {
+      fs.unlinkSync(tempFilePath);
+    }
+    if (response) {
+      return {
+        id: response.data.id,
+        date: response.data.timestamp,
+      };
+    } else {
+      throw new Error("Failed to get a response from the server");
+    }
   }
 }
